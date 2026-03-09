@@ -183,23 +183,68 @@ function SB({ bg, c, onClick, children }) {
 
 // ── 日期選擇器 ────────────────────────────────────────
 function DatePicker({ selected, onChange, markedDates, accentColor }) {
-  const dates = [];
-  for (let i = -7; i <= 90; i++) {
-    const d = new Date();
-    d.setDate(d.getDate() + i);
-    dates.push(d.toISOString().slice(0, 10));
+  // 找到 selected 日期所在週的週一
+  function getWeekStart(dateStr) {
+    const d = new Date(dateStr);
+    const day = d.getDay(); // 0=日,1=一,...,6=六
+    const diff = day === 0 ? -6 : 1 - day; // 調整到週一
+    d.setDate(d.getDate() + diff);
+    return d.toISOString().slice(0, 10);
   }
+
+  const [weekStart, setWeekStart] = React.useState(() => getWeekStart(selected || todayStr()));
+
+  // 產生這週的 7 天
+  function getWeekDates(startStr) {
+    const days = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(startStr);
+      d.setDate(d.getDate() + i);
+      days.push(d.toISOString().slice(0, 10));
+    }
+    return days;
+  }
+
+  function shiftWeek(dir) {
+    const d = new Date(weekStart);
+    d.setDate(d.getDate() + dir * 7);
+    const newStart = d.toISOString().slice(0, 10);
+    setWeekStart(newStart);
+    // 自動選該週第一個有排程的日，或週一
+    onChange(newStart);
+  }
+
+  const weekDates = getWeekDates(weekStart);
+  const [,wm,wd] = weekStart.split("-");
+  const weekEndDate = weekDates[6];
+  const [,em,ed] = weekEndDate.split("-");
+
   return (
-    <div style={{ overflowX:"auto", padding:"10px 16px 2px" }}>
-      <div style={{ display:"flex", gap:8, width:"max-content" }}>
-        {dates.map((d) => {
+    <div style={{ padding:"10px 16px 2px" }}>
+      {/* 週導覽列 */}
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:8 }}>
+        <button onClick={() => shiftWeek(-1)} style={{
+          background:"#f0f0f0", border:"none", borderRadius:10, padding:"6px 14px",
+          cursor:"pointer", fontSize:16, color:"#555", fontFamily:"inherit"
+        }}>‹</button>
+        <div style={{ fontSize:13, fontWeight:600, color:"#666" }}>
+          {parseInt(wm)}/{parseInt(wd)} ～ {parseInt(em)}/{parseInt(ed)}
+        </div>
+        <button onClick={() => shiftWeek(1)} style={{
+          background:"#f0f0f0", border:"none", borderRadius:10, padding:"6px 14px",
+          cursor:"pointer", fontSize:16, color:"#555", fontFamily:"inherit"
+        }}>›</button>
+      </div>
+      {/* 7 天格子 */}
+      <div style={{ display:"flex", gap:6 }}>
+        {weekDates.map((d) => {
           const sel = d === selected, tod = d === todayStr();
           const [,m,day] = d.split("-");
           const dow = ["日","一","二","三","四","五","六"][new Date(d).getDay()];
           const hasMark = !!(markedDates && markedDates[d] && markedDates[d].length);
           return (
             <div key={d} onClick={() => onChange(d)} style={{
-              minWidth:52, textAlign:"center", padding:"8px 4px", borderRadius:12,
+              flex:1, textAlign:"center", padding:"8px 2px", borderRadius:12,
               cursor:"pointer", userSelect:"none",
               background: sel ? accentColor : tod ? accentColor+"22" : "#fff",
               color: sel ? "#fff" : tod ? accentColor : "#666",
@@ -207,8 +252,9 @@ function DatePicker({ selected, onChange, markedDates, accentColor }) {
               boxShadow: sel ? `0 4px 14px ${accentColor}44` : "none",
             }}>
               <div style={{ fontSize:10, opacity:0.8 }}>{parseInt(m)}/{parseInt(day)}</div>
-              <div style={{ fontSize:13, fontWeight:sel?700:400 }}>週{dow}</div>
-              <div style={{ width:5, height:5, borderRadius:"50%", margin:"3px auto 0", background: hasMark ? (sel?"#fff":accentColor) : "transparent" }}/>
+              <div style={{ fontSize:12, fontWeight:sel?700:500 }}>週{dow}</div>
+              <div style={{ width:5, height:5, borderRadius:"50%", margin:"3px auto 0",
+                background: hasMark ? (sel?"#fff":accentColor) : "transparent" }}/>
             </div>
           );
         })}
